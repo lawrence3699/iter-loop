@@ -1,0 +1,61 @@
+{
+  "name": "loop-cli",
+  "version": "0.1.0",
+  "description": "Iterative Multi-Engine AI Orchestration",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "loop": "./dist/index.js",
+    "lclaude": "./dist/bin/lclaude.js",
+    "lgemini": "./dist/bin/lgemini.js",
+    "lcodex": "./dist/bin/lcodex.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist/",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "cli",
+    "ai",
+    "orchestration",
+    "multi-agent",
+    "claude",
+    "gemini",
+    "codex",
+    "iteration",
+    "loop"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.10.0",
+    "blessed": "^0.1.81",
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "gradient-string": "^3.0.0",
+    "gray-matter": "^4.0.3",
+    "node-pty": "^1.0.0",
+    "strip-ansi": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/blessed": "^0.1.25",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0",
+    "@vitest/coverage-v8": "^3.0.0"
+  }
+}
