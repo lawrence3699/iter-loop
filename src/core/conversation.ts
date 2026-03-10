@@ -172,14 +172,38 @@ async function runPtySession(
   const renderer = new PtyRenderer(engine.name, engine.label);
   renderer.start();
 
-  // Create PTY session via engine.interactive()
-  const session = engine.interactive({
-    cwd: opts.cwd,
-    passthroughArgs: opts.passthroughArgs,
-    onData(data: string) {
-      renderer.write(data);
-    },
-  });
+  // Create PTY session via engine.interactive(), with fallback to engine.run()
+  let session: PtySession;
+  try {
+    session = engine.interactive({
+      cwd: opts.cwd,
+      passthroughArgs: opts.passthroughArgs,
+      onData(data: string) {
+        renderer.write(data);
+      },
+    });
+  } catch (err) {
+    // PTY spawn failed — fall back to non-interactive engine.run()
+    const msg = err instanceof Error ? err.message : String(err);
+    renderer.stop({ elapsed: "0.0s", bytes: "0 B" });
+    console.log(dim(`  PTY spawn failed: ${msg}`));
+    console.log(dim(`  Falling back to non-interactive mode...\n`));
+
+    const start = Date.now();
+    const output = await engine.run(initialPrompt, {
+      cwd: opts.cwd,
+      verbose: opts.verbose,
+      passthroughArgs: opts.passthroughArgs,
+      onData(chunk: string) {
+        process.stdout.write(chunk);
+      },
+    });
+    return {
+      output,
+      bytes: Buffer.byteLength(output),
+      durationMs: Date.now() - start,
+    };
+  }
 
   return new Promise((resolve, reject) => {
     let done = false;

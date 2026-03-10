@@ -63,7 +63,7 @@ export interface PtySessionOptions {
 
 export class PtySession extends EventEmitter {
   // -- PTY process ----------------------------------------------------------
-  private readonly _pty: ReturnType<typeof pty.spawn>;
+  private readonly _pty!: ReturnType<typeof pty.spawn>;
   private _alive = true;
   private _lastExitCode: number = 0;
 
@@ -107,13 +107,21 @@ export class PtySession extends EventEmitter {
     this._engine = opts?.engine;
     this._promptPattern = DEFAULT_PROMPT_PATTERN;
 
-    this._pty = pty.spawn(command, args, {
-      name: "xterm-256color",
-      cols,
-      rows,
-      cwd,
-      env: { ...process.env, ...(opts?.env ?? {}) },
-    });
+    try {
+      this._pty = pty.spawn(command, args, {
+        name: "xterm-256color",
+        cols,
+        rows,
+        cwd,
+        env: { ...process.env, ...(opts?.env ?? {}) },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Failed to spawn PTY for "${command}": ${msg}\n` +
+        `Ensure "${command}" is installed and available in your PATH.`,
+      );
+    }
 
     // ── PTY data handler ──────────────────────────────────────────────
     this._pty.onData((data: string) => {

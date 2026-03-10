@@ -115,18 +115,22 @@ export async function interactive(): Promise<InteractiveConfig | null> {
   }
 
   // Native CLI flags (optional)
+  const PASS_ARGS_PLACEHOLDER = "e.g., --model claude-sonnet-4-20250514";
   const passArgsInput = await p.text({
     message: "Native CLI flags for executor (optional)",
-    placeholder: "e.g., --model claude-sonnet-4-20250514",
+    placeholder: PASS_ARGS_PLACEHOLDER,
     defaultValue: "",
   });
   if (p.isCancel(passArgsInput)) {
     p.cancel("Cancelled.");
     return null;
   }
-  const passthroughArgs = passArgsInput.trim()
-    ? passArgsInput.split(/\s+/).filter(Boolean)
-    : [];
+  // Guard against @clack/prompts returning placeholder text as the value
+  const rawPassArgs = typeof passArgsInput === "string" ? passArgsInput : "";
+  const passthroughArgs =
+    rawPassArgs.trim() && rawPassArgs.trim() !== PASS_ARGS_PLACEHOLDER
+      ? rawPassArgs.split(/\s+/).filter(Boolean)
+      : [];
 
   // Task
   const task = await p.text({
