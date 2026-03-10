@@ -60,15 +60,17 @@ loop [task]              # Run iteration loop (interactive if no task)
 loop daemon start        # Start background daemon
 loop daemon stop         # Stop daemon
 loop daemon status       # Check daemon status
-loop bus tail            # Stream event bus
-loop bus stats           # Show bus statistics
+loop bus send <message>  # Send a message on the event bus
+loop bus check <id>      # Check for pending bus messages
+loop bus status          # Show event bus status
 loop chat                # Open real-time dashboard
 loop plan show           # Show current iteration plan
 loop plan clear          # Clear plan
-loop ctx add             # Add architectural decision
+loop ctx add <title>     # Add architectural decision
 loop ctx list            # List decisions
+loop ctx resolve <id>    # Resolve a decision
 loop skills list         # List available skills
-loop skills show <name>  # Show skill content
+loop skills add <name>   # Add a new skill
 ```
 
 ## Options
@@ -77,12 +79,12 @@ loop skills show <name>  # Show skill content
 |------|-------------|
 | `-e, --executor <engine>` | Executor engine: `claude` \| `gemini` \| `codex` |
 | `-r, --reviewer <engine>` | Reviewer engine: `claude` \| `gemini` \| `codex` |
-| `-n, --iterations <num>` | Max iterations (default: 5) |
+| `-n, --iterations <num>` | Max iterations (default: 3) |
 | `-d, --dir <path>` | Working directory |
 | `-v, --verbose` | Stream real-time output |
 | `--auto` | Auto mode — skip manual conversation |
 | `--pass <args...>` | Pass native flags to executor CLI |
-| `--threshold <num>` | Approval score threshold, 1-10 (default: 8) |
+| `--threshold <num>` | Approval score threshold, 1-10 (default: 9) |
 
 ## How It Works
 
@@ -104,12 +106,15 @@ Create `.loop/config.json` in your project:
 
 ```json
 {
-  "executor": "claude",
-  "reviewer": "gemini",
-  "maxIterations": 5,
-  "threshold": 8,
-  "verbose": false,
-  "auto": false
+  "defaultExecutor": "claude",
+  "defaultReviewer": "gemini",
+  "maxIterations": 3,
+  "threshold": 9,
+  "mode": "manual",
+  "launchMode": "auto",
+  "autoResume": false,
+  "skillsDir": ".loop/skills",
+  "verbose": false
 }
 ```
 

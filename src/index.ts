@@ -2,7 +2,7 @@
 
 import { Command } from "commander";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, join, dirname } from "node:path";
 import { bold, red, yellow, green } from "./ui/colors.js";
 import { type EngineName, ENGINE_NAMES } from "./config/schema.js";
 import { loadConfig } from "./config/index.js";
@@ -13,14 +13,21 @@ import { SkillRegistry } from "./skills/registry.js";
 import { runLoop } from "./core/loop.js";
 import { createEngine } from "./core/engine.js";
 import { EventBus } from "./bus/event-bus.js";
-import { OrchestratorDaemon } from "./orchestrator/daemon.js";
+import {
+  daemonize,
+  readPidFile,
+  isProcessAlive,
+  removePidFile,
+} from "./utils/process.js";
+import { createConnection } from "node:net";
+import { fileURLToPath } from "node:url";
 
 const program = new Command();
 
 program
   .name("loop")
   .description("Iterative multi-engine AI orchestration CLI — Claude, Gemini, Codex")
-  .version("0.1.0")
+  .version("0.2.0")
   .argument("[task]", "Task description (omit to enter interactive mode)")
   .option("-e, --executor <engine>", "Executor engine: claude | gemini | codex")
   .option("-r, --reviewer <engine>", "Reviewer engine: claude | gemini | codex")
@@ -165,10 +172,25 @@ daemon
   .action(async () => {
     try {
       const cwd = process.cwd();
-      const mgr = new OrchestratorDaemon(cwd);
+      const runDirPath = join(cwd, ".loop", "run");
+      const pidPath = join(runDirPath, "loop-daemon.pid");
+      const logPath = join(runDirPath, "loop-daemon.log");
+
+      // Check if already running
+      const existingPid = readPidFile(pidPath);
+      if (existingPid !== null && isProcessAlive(existingPid)) {
+        console.log(yellow(`  Daemon already running (pid=${existingPid})`));
+        return;
+      }
+
+      // Resolve daemon entry script relative to this compiled module
+      const thisFile = fileURLToPath(import.meta.url);
+      const thisDir = dirname(thisFile);
+      const entryScript = join(thisDir, "orchestrator", "daemon-entry.js");
+
       console.log(bold("  Starting daemon..."));
-      await mgr.start();
-      console.log(green("  Daemon started (pid=" + process.pid + ")"));
+      const pid = daemonize(entryScript, [], logPath);
+      console.log(green(`  Daemon started (pid=${pid})`));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(red(`  Error: ${msg}`));
@@ -182,13 +204,20 @@ daemon
   .action(async () => {
     try {
       const cwd = process.cwd();
-      const mgr = new OrchestratorDaemon(cwd);
-      if (!mgr.isRunning()) {
+      const pidPath = join(cwd, ".loop", "run", "loop-daemon.pid");
+
+      const pid = readPidFile(pidPath);
+      if (pid === null || !isProcessAlive(pid)) {
         console.log(yellow("  Daemon is not running."));
+        removePidFile(pidPath);
         return;
       }
-      await mgr.stop();
-      console.log(green("  Daemon stopped."));
+
+      process.kill(pid, "SIGTERM");
+      console.log(green(`  Daemon stopped (pid=${pid}).`));
+
+      // Clean up PID file after kill
+      removePidFile(pidPath);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(red(`  Error: ${msg}`));
@@ -202,17 +231,57 @@ daemon
   .action(async () => {
     try {
       const cwd = process.cwd();
-      const mgr = new OrchestratorDaemon(cwd);
-      if (!mgr.isRunning()) {
+      const pidPath = join(cwd, ".loop", "run", "loop-daemon.pid");
+      const socketPath = join(cwd, ".loop", "run", "loop.sock");
+
+      const pid = readPidFile(pidPath);
+      if (pid === null || !isProcessAlive(pid)) {
         console.log(yellow("  Daemon is not running."));
         return;
       }
-      const status = await mgr.getStatus();
+
+      // Connect to the daemon's IPC socket and request STATUS
+      const status = await new Promise<Record<string, unknown>>((resolvePromise, rejectPromise) => {
+        const client = createConnection(socketPath, () => {
+          client.write(JSON.stringify({ type: "STATUS", data: {} }) + "\n");
+        });
+
+        let buffer = "";
+        const timeout = setTimeout(() => {
+          client.destroy();
+          rejectPromise(new Error("Timed out waiting for daemon status"));
+        }, 5_000);
+
+        client.on("data", (data) => {
+          buffer += data.toString("utf8");
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const payload = JSON.parse(line) as Record<string, unknown>;
+              clearTimeout(timeout);
+              client.end();
+              resolvePromise(payload);
+              return;
+            } catch {
+              // skip malformed lines
+            }
+          }
+        });
+
+        client.on("error", (err) => {
+          clearTimeout(timeout);
+          rejectPromise(err);
+        });
+      });
+
+      const statusData = (status.data ?? {}) as Record<string, unknown>;
       console.log(bold("  Daemon status:"));
-      console.log(`  PID:       ${status.pid}`);
-      console.log(`  Uptime:    ${status.uptime}s`);
-      console.log(`  Agents:    ${status.agents}`);
-      console.log(`  Events:    ${status.busEvents}`);
+      console.log(`  PID:       ${statusData.pid ?? pid}`);
+      console.log(`  Uptime:    ${statusData.uptime ?? "?"}s`);
+      console.log(`  Agents:    ${statusData.agents ?? 0}`);
+      console.log(`  Events:    ${statusData.busEvents ?? 0}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(red(`  Error: ${msg}`));

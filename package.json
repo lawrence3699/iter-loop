@@ -1,6 +1,6 @@
 {
   "name": "@lawrence369/loop-cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Iterative Multi-Engine AI Orchestration",
   "type": "module",
   "main": "./dist/index.js",

@@ -5,6 +5,7 @@
  * with idle detection, mode toggling, and user-controlled continuation.
  */
 
+import * as readline from "node:readline";
 import type { Engine } from "./engine.js";
 import type { PtySession } from "../agent/pty-session.js";
 import { dim, formatBytes, brandColor } from "../ui/colors.js";
@@ -349,6 +350,38 @@ async function runPtySession(
   });
 }
 
+// ── User prompt helper (readline-based) ──────────────
+
+/**
+ * Prompt the user for a follow-up message using Node's readline module.
+ * Returns the trimmed user input, or `null` on Ctrl+D / EOF / empty input / "/done".
+ */
+function promptUser(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    rl.question(dim("  Follow-up (empty or /done to submit): "), (answer) => {
+      rl.close();
+      const trimmed = answer.trim();
+      if (trimmed === "" || trimmed === "/done") {
+        resolve(null);
+      } else {
+        resolve(trimmed);
+      }
+    });
+
+    // Handle Ctrl+D (EOF) — readline emits 'close' without calling the callback
+    rl.on("close", () => {
+      // If the question callback already resolved, this is a no-op.
+      // If Ctrl+D was pressed, resolve with null to signal "submit".
+      resolve(null);
+    });
+  });
+}
+
 // ── Main conversation loop ───────────────────────────
 
 /**
@@ -370,27 +403,66 @@ export async function runConversation(
   }
 
   // Run first interactive PTY session
-  const { output, bytes, durationMs } = await runPtySession(
-    engine,
-    initialPrompt,
-    { cwd, verbose, mode, passthroughArgs },
-  );
+  let currentPrompt = initialPrompt;
+  let accumulatedOutput = "";
+  let totalBytes = 0;
+  let totalDurationMs = 0;
 
-  // Auto mode: done, submit to reviewer
+  const firstResult = await runPtySession(engine, currentPrompt, {
+    cwd,
+    verbose,
+    mode,
+    passthroughArgs,
+  });
+
+  accumulatedOutput += firstResult.output;
+  totalBytes += firstResult.bytes;
+  totalDurationMs += firstResult.durationMs;
+
+  // Auto mode (or switched to auto during first session): done, submit to reviewer
   if (mode.current === "auto") {
     return {
-      finalOutput: output,
-      duration_ms: durationMs,
-      bytes_received: bytes,
+      finalOutput: accumulatedOutput,
+      duration_ms: totalDurationMs,
+      bytes_received: totalBytes,
     };
   }
 
-  // Manual mode: the user can continue interacting or submit
-  // For now, return the first session output. Full multi-turn manual flow
-  // (promptUser loop) is handled at a higher layer.
+  // Manual mode: multi-turn loop — prompt user after each PTY session
+  while (mode.current === "manual") {
+    console.log(
+      dim(
+        `  Session complete. Accumulated ${formatBytes(totalBytes)} over ${(totalDurationMs / 1000).toFixed(1)}s.`,
+      ),
+    );
+
+    const followUp = await promptUser();
+
+    // null means user wants to submit (empty input, /done, or Ctrl+D)
+    if (followUp === null) {
+      break;
+    }
+
+    // Run another PTY session with the follow-up prompt
+    currentPrompt = followUp;
+    const result = await runPtySession(engine, currentPrompt, {
+      cwd,
+      verbose,
+      mode,
+      passthroughArgs,
+    });
+
+    accumulatedOutput += "\n" + result.output;
+    totalBytes += result.bytes;
+    totalDurationMs += result.durationMs;
+
+    // If the mode was switched to auto during the session (via Shift+Tab),
+    // the while condition will handle it — no explicit break needed.
+  }
+
   return {
-    finalOutput: output,
-    duration_ms: durationMs,
-    bytes_received: bytes,
+    finalOutput: accumulatedOutput,
+    duration_ms: totalDurationMs,
+    bytes_received: totalBytes,
   };
 }

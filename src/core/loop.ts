@@ -19,32 +19,23 @@ import {
 } from "./protocol.js";
 import { evaluateReview, type ScoringConfig } from "./scoring.js";
 import { bold, dim, success, warn, brandColor } from "../ui/colors.js";
+import type { IterationRecord } from "../plan/shared-plan.js";
 
 // Shared plan functions — loaded lazily on first use to avoid race conditions.
 // Gracefully degrade to no-ops if the module isn't available.
-interface SharedPlanRecord {
-  iteration: number;
-  timestamp: string;
-  executor: string;
-  reviewer: string;
-  executorSummary: string;
-  reviewerScore: number;
-  reviewerApproved: boolean;
-  reviewerFeedback: string;
-}
 
 interface SharedPlanModule {
-  initSharedPlan: (cwd: string, task: string) => void;
-  updateSharedPlan: (cwd: string, record: SharedPlanRecord, filesChanged: string[]) => void;
-  getExecutorContext: (cwd: string) => string;
-  getReviewerContext: (cwd: string) => string;
+  initSharedPlan: (cwd: string, task: string) => Promise<void>;
+  updateSharedPlan: (cwd: string, record: IterationRecord, filesChanged: string[]) => Promise<void>;
+  getExecutorContext: (cwd: string) => Promise<string>;
+  getReviewerContext: (cwd: string) => Promise<string>;
 }
 
 const NO_OP_PLAN: SharedPlanModule = {
-  initSharedPlan: () => {},
-  updateSharedPlan: () => {},
-  getExecutorContext: () => "",
-  getReviewerContext: () => "",
+  initSharedPlan: async () => {},
+  updateSharedPlan: async () => {},
+  getExecutorContext: async () => "",
+  getReviewerContext: async () => "",
 };
 
 // Lazy-loaded promise — awaited before first use in runLoop()
@@ -141,7 +132,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
 
   // Load shared plan module (awaited — no race condition)
   const plan = await loadPlanModule();
-  plan.initSharedPlan(cwd, task);
+  await plan.initSharedPlan(cwd, task);
 
   let executorOutput = "";
   let reviewerFeedback = "";
@@ -158,7 +149,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     if (i === 1) {
       initialPrompt = task;
     } else {
-      const executorContext = plan.getExecutorContext(cwd);
+      const executorContext = await plan.getExecutorContext(cwd);
       initialPrompt = [
         "Please revise your previous work based on the following review feedback.",
         "",
@@ -202,7 +193,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     history.push(executorMsg);
 
     // ── Reviewer ──
-    const reviewerContext = plan.getReviewerContext(cwd);
+    const reviewerContext = await plan.getReviewerContext(cwd);
     const reviewPrompt = [
       "You are a code review expert. Please review the following task completion.",
       "",
@@ -257,7 +248,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     const scoringResult = evaluateReview(reviewerMsg.review, scoringConfig);
 
     // Update shared plan with iteration data
-    plan.updateSharedPlan(
+    await plan.updateSharedPlan(
       cwd,
       {
         iteration: i,
@@ -265,8 +256,8 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
         executor: executor.name,
         reviewer: reviewer.name,
         executorSummary: executorOutput.slice(0, 500),
-        reviewerScore: reviewerMsg.review?.score ?? 0,
-        reviewerApproved: scoringResult.approved,
+        score: reviewerMsg.review?.score ?? 0,
+        approved: scoringResult.approved,
         reviewerFeedback: reviewerFeedback.slice(0, 500),
       },
       executorMsg.output.files_changed,

@@ -255,11 +255,10 @@ export class OrchestratorDaemon {
         }
 
         case "LAUNCH_AGENT": {
-          // Placeholder - actual agent launching is handled by the agent launcher
           return {
-            success: true,
+            success: false,
             type: "LAUNCH_AGENT",
-            data: { message: "Agent launch request received" },
+            error: "Not implemented",
           };
         }
 
@@ -275,25 +274,25 @@ export class OrchestratorDaemon {
 
         case "RESUME_AGENTS": {
           return {
-            success: true,
+            success: false,
             type: "RESUME_AGENTS",
-            data: { message: "Resume request received" },
+            error: "Not implemented",
           };
         }
 
         case "LAUNCH_GROUP": {
           return {
-            success: true,
+            success: false,
             type: "LAUNCH_GROUP",
-            data: { message: "Group launch request received" },
+            error: "Not implemented",
           };
         }
 
         case "STOP_GROUP": {
           return {
-            success: true,
+            success: false,
             type: "STOP_GROUP",
-            data: { message: "Group stop request received" },
+            error: "Not implemented",
           };
         }
 

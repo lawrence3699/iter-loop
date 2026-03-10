@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-03-10
+
+### Fixed
+
+- Shared plan async/sync contract mismatch: all plan functions now properly awaited
+- Shared plan field name drift: `reviewerScore`/`reviewerApproved` → `score`/`approved`
+- Agent launcher IPC socket path: `daemon.sock` → `loop.sock` to match daemon
+- Agent launcher IPC message format: aligned to UPPERCASE types + nested `data` object
+- Daemon start/stop/status: real background daemon with PID file and IPC-based status
+- Placeholder IPC handlers (LAUNCH_AGENT, RESUME_AGENTS, LAUNCH_GROUP, STOP_GROUP) now return explicit "not implemented" errors
+- README: config field names, default values, and command list aligned with actual CLI
+- CLI version string now matches package.json
+
+### Added
+
+- Multi-turn manual mode: readline-based follow-up prompting between PTY sessions
+- Daemon entry script for proper background process management
+- 33 new regression tests (315 total across 26 test files)
+
 ## [0.1.2] - 2026-03-10
 
 ### Fixed

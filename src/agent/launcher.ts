@@ -56,7 +56,7 @@ function runDir(projectRoot: string): string {
 }
 
 function daemonSocketPath(projectRoot: string): string {
-  return path.join(runDir(projectRoot), "daemon.sock");
+  return path.join(runDir(projectRoot), "loop.sock");
 }
 
 function connectSocket(sockPath: string): Promise<net.Socket> {
@@ -130,11 +130,12 @@ async function registerWithDaemon(
         } catch {
           continue;
         }
-        if (payload.type === "register_ok" && typeof payload.subscriberId === "string") {
+        const responseData = payload.data as Record<string, unknown> | undefined;
+        if (payload.success === true && responseData?.subscriber_id) {
           if (settled) return;
           settled = true;
           cleanup();
-          resolve(payload.subscriberId);
+          resolve(String(responseData.subscriber_id));
           return;
         }
         if (payload.type === "error") {
@@ -148,10 +149,8 @@ async function registerWithDaemon(
     });
 
     const req = {
-      type: "register_agent",
-      agentType,
-      nickname,
-      parentPid: process.pid,
+      type: "REGISTER_AGENT",
+      data: { agent_type: agentType, nickname, pid: process.pid },
     };
     client.write(JSON.stringify(req) + "\n");
   });
@@ -245,8 +244,8 @@ export class AgentLauncher {
         if (!client) return;
         client.write(
           JSON.stringify({
-            type: "agent_ready",
-            subscriberId,
+            type: "AGENT_READY",
+            data: { subscriber_id: subscriberId },
           }) + "\n",
         );
         client.end();
