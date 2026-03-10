@@ -833,7 +833,7 @@
 
       <div class="hero-install" id="installBox" title="Click to copy">
         <span class="prompt">$</span>
-        <span class="cmd-text">npm install -g loop-cli</span>
+        <span class="cmd-text">npm install -g @lawrence369/loop-cli</span>
         <span class="cursor-blink"></span>
         <span class="copy-hint">click to copy</span>
       </div>
@@ -983,7 +983,7 @@
       </div>
       <div class="terminal-body">
         <pre><span class="comment"># Install</span>
-<span class="prompt-sign">$</span> <span class="cmd">npm install -g loop-cli</span>
+<span class="prompt-sign">$</span> <span class="cmd">npm install -g @lawrence369/loop-cli</span>
 
 <span class="comment"># Interactive mode</span>
 <span class="prompt-sign">$</span> <span class="cmd">loop</span>
@@ -1132,7 +1132,7 @@
 
     // Copy install command
     document.getElementById('installBox').addEventListener('click', function() {
-      navigator.clipboard.writeText('npm install -g loop-cli').then(() => {
+      navigator.clipboard.writeText('npm install -g @lawrence369/loop-cli').then(() => {
         const hint = this.querySelector('.copy-hint');
         this.classList.add('copied');
         hint.textContent = 'copied!';

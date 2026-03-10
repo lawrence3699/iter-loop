@@ -5,7 +5,7 @@
 Combine **Claude**, **Gemini**, and **Codex** in a quality-scored iteration loop. One engine executes, another reviews. Repeat until perfect.
 
 ```
-npm install -g loop-cli
+npm install -g @lawrence369/loop-cli
 ```
 
 ## What It Does
