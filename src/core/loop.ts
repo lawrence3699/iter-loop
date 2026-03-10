@@ -20,17 +20,8 @@ import {
 import { evaluateReview, type ScoringConfig } from "./scoring.js";
 import { bold, dim, success, warn, brandColor } from "../ui/colors.js";
 
-// Shared plan functions — imported from plan module (implemented by another agent).
-// Gracefully degrade if the module isn't available yet.
-let initSharedPlan: (cwd: string, task: string) => void = () => {};
-let updateSharedPlan: (
-  cwd: string,
-  record: SharedPlanRecord,
-  filesChanged: string[],
-) => void = () => {};
-let getExecutorContext: (cwd: string) => string = () => "";
-let getReviewerContext: (cwd: string) => string = () => "";
-
+// Shared plan functions — loaded lazily on first use to avoid race conditions.
+// Gracefully degrade to no-ops if the module isn't available.
 interface SharedPlanRecord {
   iteration: number;
   timestamp: string;
@@ -42,31 +33,43 @@ interface SharedPlanRecord {
   reviewerFeedback: string;
 }
 
-// Attempt to load shared-plan module at runtime — non-fatal if missing.
-// Uses a dynamic import wrapped in an async IIFE to avoid top-level module
-// resolution failure (TypeScript cannot verify the module exists yet).
-void (async () => {
+interface SharedPlanModule {
+  initSharedPlan: (cwd: string, task: string) => void;
+  updateSharedPlan: (cwd: string, record: SharedPlanRecord, filesChanged: string[]) => void;
+  getExecutorContext: (cwd: string) => string;
+  getReviewerContext: (cwd: string) => string;
+}
+
+const NO_OP_PLAN: SharedPlanModule = {
+  initSharedPlan: () => {},
+  updateSharedPlan: () => {},
+  getExecutorContext: () => "",
+  getReviewerContext: () => "",
+};
+
+// Lazy-loaded promise — awaited before first use in runLoop()
+let _planModule: SharedPlanModule | null = null;
+
+async function loadPlanModule(): Promise<SharedPlanModule> {
+  if (_planModule) return _planModule;
   try {
-    // Use a computed path so TypeScript does not attempt static resolution
-    // of a module that may not exist yet (implemented by the plan agent).
     const planPath = ["../plan", "shared-plan.js"].join("/");
-    const mod = (await import(/* webpackIgnore: true */ planPath)) as Record<string, unknown>;
-    if (typeof mod.initSharedPlan === "function") {
-      initSharedPlan = mod.initSharedPlan as typeof initSharedPlan;
-    }
-    if (typeof mod.updateSharedPlan === "function") {
-      updateSharedPlan = mod.updateSharedPlan as typeof updateSharedPlan;
-    }
-    if (typeof mod.getExecutorContext === "function") {
-      getExecutorContext = mod.getExecutorContext as typeof getExecutorContext;
-    }
-    if (typeof mod.getReviewerContext === "function") {
-      getReviewerContext = mod.getReviewerContext as typeof getReviewerContext;
-    }
+    const mod = (await import(planPath)) as Record<string, unknown>;
+    _planModule = {
+      initSharedPlan: typeof mod.initSharedPlan === "function"
+        ? mod.initSharedPlan as SharedPlanModule["initSharedPlan"] : NO_OP_PLAN.initSharedPlan,
+      updateSharedPlan: typeof mod.updateSharedPlan === "function"
+        ? mod.updateSharedPlan as SharedPlanModule["updateSharedPlan"] : NO_OP_PLAN.updateSharedPlan,
+      getExecutorContext: typeof mod.getExecutorContext === "function"
+        ? mod.getExecutorContext as SharedPlanModule["getExecutorContext"] : NO_OP_PLAN.getExecutorContext,
+      getReviewerContext: typeof mod.getReviewerContext === "function"
+        ? mod.getReviewerContext as SharedPlanModule["getReviewerContext"] : NO_OP_PLAN.getReviewerContext,
+    };
   } catch {
-    // Shared plan module not yet implemented — functions remain no-ops
+    _planModule = NO_OP_PLAN;
   }
-})();
+  return _planModule;
+}
 
 // ── Public types ─────────────────────────────────────
 
@@ -133,8 +136,9 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     requireExplicitApproval: false,
   };
 
-  // Initialize shared plan
-  initSharedPlan(cwd, task);
+  // Load shared plan module (awaited — no race condition)
+  const plan = await loadPlanModule();
+  plan.initSharedPlan(cwd, task);
 
   let executorOutput = "";
   let reviewerFeedback = "";
@@ -151,7 +155,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     if (i === 1) {
       initialPrompt = task;
     } else {
-      const executorContext = getExecutorContext(cwd);
+      const executorContext = plan.getExecutorContext(cwd);
       initialPrompt = [
         "Please revise your previous work based on the following review feedback.",
         "",
@@ -195,7 +199,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     history.push(executorMsg);
 
     // ── Reviewer ──
-    const reviewerContext = getReviewerContext(cwd);
+    const reviewerContext = plan.getReviewerContext(cwd);
     const reviewPrompt = [
       "You are a code review expert. Please review the following task completion.",
       "",
@@ -250,7 +254,7 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     const scoringResult = evaluateReview(reviewerMsg.review, scoringConfig);
 
     // Update shared plan with iteration data
-    updateSharedPlan(
+    plan.updateSharedPlan(
       cwd,
       {
         iteration: i,

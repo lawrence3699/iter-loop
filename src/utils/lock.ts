@@ -1,5 +1,6 @@
 import { openSync, writeSync, closeSync, readFileSync, writeFileSync, unlinkSync, statSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { isProcessAlive } from "./process.js";
 
 const LOCK_TIMEOUT_MS = 5000;
 const LOCK_POLL_MS = 25;
@@ -7,18 +8,6 @@ const LOCK_STALE_MS = 30000;
 
 function isNodeError(err: unknown): err is NodeJS.ErrnoException {
   return err instanceof Error && "code" in err;
-}
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err: unknown) {
-    if (isNodeError(err) && err.code === "EPERM") {
-      return true;
-    }
-    return false;
-  }
 }
 
 function cleanupStaleLock(lockPath: string): void {

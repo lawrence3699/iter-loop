@@ -271,10 +271,9 @@ export class AgentLauncher {
     const handleSignal = (signal: string) => {
       if (signalHandled) return;
       signalHandled = true;
-      cleanup().catch(() => { /* ignore */ });
       // Use conventional exit codes for signals
       const code = signal === "SIGTERM" ? 143 : 130;
-      process.exit(code);
+      cleanup().finally(() => process.exit(code));
     };
     process.on("SIGTERM", () => handleSignal("SIGTERM"));
     process.on("SIGINT", () => handleSignal("SIGINT"));

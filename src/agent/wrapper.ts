@@ -100,27 +100,34 @@ export async function launchWrappedAgent(
   // Wait for exit
   return new Promise<void>((resolve) => {
     agent.ptySession.on("exit", async (code: number) => {
-      // Clean up stdin
-      process.stdin.removeListener("data", onStdinData);
-      if (process.stdin.isTTY && typeof process.stdin.setRawMode === "function") {
-        try {
-          process.stdin.setRawMode(false);
-        } catch {
-          // May fail if stream is already closed
+      try {
+        // Clean up stdin
+        process.stdin.removeListener("data", onStdinData);
+        if (process.stdin.isTTY && typeof process.stdin.setRawMode === "function") {
+          try {
+            process.stdin.setRawMode(false);
+          } catch {
+            // May fail if stream is already closed
+          }
         }
+
+        // Clean up resize handler
+        if (process.stdout.isTTY) {
+          process.stdout.removeListener("resize", onResize);
+        }
+
+        // Run cleanup (detectors, logger, sockets)
+        await agent.cleanup();
+
+        // Exit with the agent's code
+        process.exitCode = code;
+        resolve();
+      } catch (err: unknown) {
+        // Prevent unhandled rejection from async exit handler
+        console.error("Exit handler error:", err instanceof Error ? err.message : String(err));
+        process.exitCode = code || 1;
+        resolve();
       }
-
-      // Clean up resize handler
-      if (process.stdout.isTTY) {
-        process.stdout.removeListener("resize", onResize);
-      }
-
-      // Run cleanup (detectors, logger, sockets)
-      await agent.cleanup();
-
-      // Exit with the agent's code
-      process.exitCode = code;
-      resolve();
     });
   });
 }
