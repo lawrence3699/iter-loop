@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>loop — Iterative Multi-Engine AI Orchestration</title>
+  <meta name="description" content="Combine Claude, Gemini, and Codex in a quality-scored iteration loop. File-based event bus. Multi-agent orchestration. Zero external dependencies.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F504;</text></svg>">
+  <style>
+    /* ============================================
+       loop-cli Landing Page
+       Terminal/Hacker Aesthetic — Dark Theme
+       ============================================ */
+
+    :root {
+      --bg-page: #0a0a0a;
+      --bg-surface: #111111;
+      --bg-card: #111111;
+      --bg-code: #0d1117;
+      --border: #222222;
+      --border-accent: #333333;
+
+      --text-primary: #e0e0e0;
+      --text-secondary: #888888;
+      --text-dim: #555555;
+
+      --orange: #F07623;
+      --blue: #4285F4;
+      --green: #10A37F;
+
+      --radius-card: 8px;
+      --radius-code: 4px;
+      --max-width: 1200px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-page);
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    code, pre, .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    a { color: var(--blue); text-decoration: none; transition: color 0.2s; }
+    a:hover { color: var(--orange); }
+
+    /* Gradient text utility */
+    .gradient-text {
+      background: linear-gradient(135deg, var(--orange), var(--blue), var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      background-size: 200% 200%;
+      animation: gradientShift 6s ease infinite;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Fade-in on scroll */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ============================================
+       Header / Nav
+       ============================================ */
+    .header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(10, 10, 10, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-content {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 40px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      font-size: 20px;
+      color: var(--orange);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+    }
+
+    .logo-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      background: linear-gradient(135deg, var(--orange), var(--blue));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-link:hover { color: var(--text-primary); }
+
+    .nav-cta {
+      background: linear-gradient(135deg, var(--orange), var(--blue));
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+    .nav-cta:hover { opacity: 0.9; color: #fff; }
+
+    /* ============================================
+       Hero Section
+       ============================================ */
+    .hero {
+      padding: 140px 40px 100px;
+      text-align: center;
+    }
+
+    .hero-inner {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 6px 16px;
+      border-radius: 100px;
+      margin-bottom: 32px;
+    }
+
+    .hero-badge-dot {
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s ease infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .hero-badge span:last-child {
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .hero-title {
+      font-size: 96px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 24px;
+      letter-spacing: -2px;
+    }
+
+    .hero-tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+      letter-spacing: 1px;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 640px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    .hero-install {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      padding: 16px 28px;
+      border-radius: var(--radius-card);
+      margin-bottom: 24px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      position: relative;
+    }
+    .hero-install:hover { border-color: var(--orange); }
+
+    .hero-install .prompt { color: var(--green); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .hero-install .cmd-text { color: var(--text-primary); font-family: 'JetBrains Mono', monospace; font-size: 16px; }
+    .hero-install .copy-hint {
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      margin-left: 12px;
+    }
+    .hero-install.copied .copy-hint { color: var(--green); }
+
+    .cursor-blink {
+      display: inline-block;
+      width: 10px; height: 20px;
+      background: var(--orange);
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 4px;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--orange), var(--blue));
+      color: #fff;
+    }
+    .btn-primary:hover { opacity: 0.9; color: #fff; }
+
+    .btn-secondary {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+    .btn-secondary:hover { border-color: var(--text-secondary); color: #fff; }
+
+    /* ============================================
+       Section Utilities
+       ============================================ */
+    .section {
+      padding: 100px 40px;
+    }
+
+    .section-alt {
+      background: var(--bg-surface);
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 64px;
+    }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--orange);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      display: block;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .section-header h2 {
+      font-size: 42px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .container {
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+
+    /* ============================================
+       How It Works — Flow Diagram
+       ============================================ */
+    .flow-diagram {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .flow-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+
+    .flow-box {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 16px 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .flow-box.orange-border { border-color: var(--orange); }
+    .flow-box.blue-border { border-color: var(--blue); }
+    .flow-box.green-border { border-color: var(--green); }
+
+    .flow-box .box-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: block;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .flow-box .box-value {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .flow-box .box-value.orange { color: var(--orange); }
+    .flow-box .box-value.blue { color: var(--blue); }
+    .flow-box .box-value.green { color: var(--green); }
+
+    .flow-arrow {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      font-size: 20px;
+      padding: 0 12px;
+      user-select: none;
+    }
+
+    .flow-arrow-down {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      font-size: 20px;
+      padding: 8px 0;
+      user-select: none;
+      text-align: center;
+    }
+
+    .flow-branch {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 60px;
+      margin-top: 4px;
+    }
+
+    .flow-branch-item {
+      text-align: center;
+    }
+
+    .flow-branch-item .flow-arrow-down {
+      color: var(--green);
+    }
+
+    .flow-feedback-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-top: 8px;
+    }
+
+    .flow-feedback-line {
+      position: relative;
+      width: 100%;
+      max-width: 700px;
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .flow-feedback-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+      padding: 4px 12px;
+      background: var(--bg-page);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-code);
+    }
+
+    /* ============================================
+       Feature Cards
+       ============================================ */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 32px;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-2px);
+    }
+
+    .feature-card .feature-icon {
+      font-size: 28px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .feature-card .feature-dash {
+      font-weight: 400;
+      color: var(--text-dim);
+    }
+
+    .feature-card p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .feature-card:nth-child(1) h3 { color: var(--orange); }
+    .feature-card:nth-child(2) h3 { color: var(--blue); }
+    .feature-card:nth-child(3) h3 { color: var(--green); }
+    .feature-card:nth-child(4) h3 { color: var(--blue); }
+    .feature-card:nth-child(5) h3 { color: var(--orange); }
+    .feature-card:nth-child(6) h3 { color: var(--green); }
+
+    /* ============================================
+       Quick Start — Terminal Code Block
+       ============================================ */
+    .terminal {
+      max-width: 760px;
+      margin: 0 auto;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f56; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #27c93f; }
+
+    .terminal-title {
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .terminal-body {
+      padding: 24px;
+      overflow-x: auto;
+    }
+
+    .terminal-body pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--text-primary);
+    }
+
+    .terminal-body .comment { color: var(--text-dim); }
+    .terminal-body .prompt-sign { color: var(--green); }
+    .terminal-body .cmd { color: var(--text-primary); }
+    .terminal-body .flag { color: var(--blue); }
+    .terminal-body .string { color: var(--orange); }
+    .terminal-body .arg { color: #e5c07b; }
+
+    /* ============================================
+       Architecture Diagram
+       ============================================ */
+    .arch-diagram {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 40px;
+      overflow-x: auto;
+    }
+
+    .arch-diagram pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-secondary);
+      text-align: center;
+      white-space: pre;
+    }
+
+    .arch-diagram .arch-orange { color: var(--orange); }
+    .arch-diagram .arch-blue { color: var(--blue); }
+    .arch-diagram .arch-green { color: var(--green); }
+    .arch-diagram .arch-dim { color: var(--text-dim); }
+    .arch-diagram .arch-bright { color: var(--text-primary); }
+
+    /* ============================================
+       Comparison Table
+       ============================================ */
+    .comparison-table-wrap {
+      max-width: 860px;
+      margin: 0 auto;
+      overflow-x: auto;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+    }
+
+    .comparison-table th {
+      text-align: left;
+      padding: 16px 20px;
+      border-bottom: 2px solid var(--border);
+      color: var(--text-dim);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .comparison-table th:last-child {
+      color: var(--orange);
+    }
+
+    .comparison-table td {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .comparison-table td:first-child {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .comparison-table td:last-child {
+      color: var(--green);
+    }
+
+    .comparison-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .comparison-table tbody tr {
+      transition: background 0.2s;
+    }
+
+    .comparison-table tbody tr:hover {
+      background: rgba(255,255,255,0.02);
+    }
+
+    /* ============================================
+       Footer
+       ============================================ */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 48px 40px;
+    }
+
+    .footer-inner {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .footer-brand .logo-text {
+      font-size: 16px;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-links a:hover { color: var(--text-primary); }
+
+    .footer-links .sep {
+      color: var(--border);
+    }
+
+    .footer-bottom-text {
+      width: 100%;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ============================================
+       Responsive
+       ============================================ */
+    @media (max-width: 1024px) {
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header-content { padding: 0 20px; }
+      .nav-link { display: none; }
+
+      .hero { padding: 120px 20px 60px; }
+      .hero-title { font-size: 56px; }
+      .hero-tagline { font-size: 16px; }
+
+      .section { padding: 60px 20px; }
+      .section-header h2 { font-size: 32px; }
+
+      .features-grid { grid-template-columns: 1fr; }
+
+      .flow-row { flex-direction: column; gap: 0; }
+      .flow-arrow { transform: rotate(90deg); padding: 8px 0; }
+      .flow-branch { flex-direction: column; gap: 16px; }
+
+      .arch-diagram { padding: 20px; }
+      .arch-diagram pre { font-size: 10px; }
+
+      .footer-inner { flex-direction: column; text-align: center; }
+      .footer-links { flex-wrap: wrap; justify-content: center; }
+    }
+
+    @media (max-width: 480px) {
+      .hero-title { font-size: 42px; }
+      .hero-install { padding: 12px 16px; }
+      .hero-install .cmd-text { font-size: 13px; }
+      .terminal-body pre { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================
+       Header
+       ============================================ -->
+  <header class="header">
+    <div class="header-content">
+      <a href="#" class="logo">
+        <span class="logo-icon">&infin;</span>
+        <span class="logo-text">LOOP</span>
+      </a>
+      <nav class="nav">
+        <a href="#how-it-works" class="nav-link">How It Works</a>
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#quick-start" class="nav-link">Quick Start</a>
+        <a href="#architecture" class="nav-link">Architecture</a>
+        <a href="https://github.com/user/loop-cli" class="nav-cta">GitHub &rarr;</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============================================
+       Hero Section
+       ============================================ -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        <span>v0.1.0 // Claude + Gemini + Codex</span>
+      </div>
+
+      <h1 class="hero-title gradient-text">loop</h1>
+
+      <p class="hero-tagline">Iterative Multi-Engine AI Orchestration</p>
+
+      <p class="hero-subtitle">
+        Combine Claude, Gemini, and Codex in a quality-scored iteration loop.
+        File-based event bus. Multi-agent orchestration. Zero external dependencies.
+      </p>
+
+      <div class="hero-install" id="installBox" title="Click to copy">
+        <span class="prompt">$</span>
+        <span class="cmd-text">npm install -g loop-cli</span>
+        <span class="cursor-blink"></span>
+        <span class="copy-hint">click to copy</span>
+      </div>
+
+      <div class="hero-cta">
+        <a href="https://github.com/user/loop-cli" class="btn btn-primary">View on GitHub &rarr;</a>
+        <a href="#quick-start" class="btn btn-secondary">Quick Start</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       How It Works
+       ============================================ -->
+  <section class="section section-alt" id="how-it-works">
+    <div class="section-header fade-in">
+      <span class="section-label">How It Works</span>
+      <h2>Quality-scored iteration loop</h2>
+      <p class="section-desc">Your task enters a feedback loop. An executor builds, a reviewer scores, and the cycle repeats until quality passes your threshold.</p>
+    </div>
+
+    <div class="flow-diagram fade-in">
+      <!-- Main flow row -->
+      <div class="flow-row">
+        <div class="flow-box orange-border">
+          <span class="box-label">Input</span>
+          <span class="box-value orange">Task</span>
+        </div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box orange-border">
+          <span class="box-label">Executor</span>
+          <span class="box-value orange">Claude</span>
+        </div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box">
+          <span class="box-label">Result</span>
+          <span class="box-value">Output</span>
+        </div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box blue-border">
+          <span class="box-label">Reviewer</span>
+          <span class="box-value blue">Gemini</span>
+        </div>
+        <span class="flow-arrow">&rarr;</span>
+        <div class="flow-box green-border">
+          <span class="box-label">Result</span>
+          <span class="box-value green">Score</span>
+        </div>
+      </div>
+
+      <!-- Branch -->
+      <div class="flow-arrow-down">&darr;</div>
+
+      <div class="flow-branch">
+        <div class="flow-branch-item">
+          <div class="flow-box green-border" style="border-style: solid;">
+            <span class="box-value green">Score &ge; 9?</span>
+          </div>
+          <div class="flow-arrow-down" style="color: var(--green);">&darr; Yes</div>
+          <div class="flow-box green-border">
+            <span class="box-value green">Done!</span>
+          </div>
+        </div>
+
+        <div class="flow-branch-item">
+          <div class="flow-box orange-border" style="border-style: dashed;">
+            <span class="box-value orange">Score &lt; 9?</span>
+          </div>
+          <div class="flow-arrow-down" style="color: var(--orange);">&darr; No</div>
+          <div class="flow-box orange-border" style="border-style: dashed;">
+            <span class="box-value orange">Feedback &rarr; Repeat</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-feedback-line">
+        <span class="flow-feedback-label">&uarr; loop feeds reviewer feedback back into executor</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       Features
+       ============================================ -->
+  <section class="section" id="features">
+    <div class="section-header fade-in">
+      <span class="section-label">Features</span>
+      <h2>Everything you need. Nothing you don't.</h2>
+    </div>
+
+    <div class="features-grid fade-in">
+      <div class="feature-card">
+        <span class="feature-icon">&gt;_</span>
+        <h3>Multi-Engine</h3>
+        <p>Claude, Gemini, Codex support. Unified Engine interface. Swap providers with a flag.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">&infin;</span>
+        <h3>Smart Iteration</h3>
+        <p>Quality-scored loop. Auto-approve at threshold. Configurable max iterations and scoring.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">&gt;|</span>
+        <h3>Event Bus</h3>
+        <p>File-based JSONL. Crash-safe. Git-friendly. Zero dependencies. Survives restarts.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">&lt;/&gt;</span>
+        <h3>Multi-Agent</h3>
+        <p>Background daemon. IPC orchestration. Activity-aware routing between agents.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">#!</span>
+        <h3>Skills System</h3>
+        <p>Executable markdown. Auto-injected prompts. Extensible skill library.</p>
+      </div>
+
+      <div class="feature-card">
+        <span class="feature-icon">[]</span>
+        <h3>Terminal Adapters</h3>
+        <p>Terminal.app, iTerm2, tmux, PTY. Pluggable backends. Works everywhere.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       Quick Start
+       ============================================ -->
+  <section class="section section-alt" id="quick-start">
+    <div class="section-header fade-in">
+      <span class="section-label">Quick Start</span>
+      <h2>Up and running in seconds</h2>
+    </div>
+
+    <div class="terminal fade-in">
+      <div class="terminal-bar">
+        <div class="terminal-dots">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+        </div>
+        <span class="terminal-title">loop &mdash; zsh</span>
+      </div>
+      <div class="terminal-body">
+        <pre><span class="comment"># Install</span>
+<span class="prompt-sign">$</span> <span class="cmd">npm install -g loop-cli</span>
+
+<span class="comment"># Interactive mode</span>
+<span class="prompt-sign">$</span> <span class="cmd">loop</span>
+
+<span class="comment"># Direct execution</span>
+<span class="prompt-sign">$</span> <span class="cmd">loop</span> <span class="string">"Build a REST API with Express"</span> <span class="flag">--executor</span> <span class="arg">claude</span> <span class="flag">--reviewer</span> <span class="arg">gemini</span>
+
+<span class="comment"># Agent wrappers</span>
+<span class="prompt-sign">$</span> <span class="cmd">lclaude</span>    <span class="comment"># Claude in loop mode</span>
+<span class="prompt-sign">$</span> <span class="cmd">lgemini</span>    <span class="comment"># Gemini in loop mode</span>
+
+<span class="comment"># Management</span>
+<span class="prompt-sign">$</span> <span class="cmd">loop daemon start</span>
+<span class="prompt-sign">$</span> <span class="cmd">loop bus status</span>
+<span class="prompt-sign">$</span> <span class="cmd">loop chat</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================
+       Architecture
+       ============================================ -->
+  <section class="section" id="architecture">
+    <div class="section-header fade-in">
+      <span class="section-label">Architecture</span>
+      <h2>Clean layers. Zero coupling.</h2>
+    </div>
+
+    <div class="arch-diagram fade-in">
+      <pre>
+<span class="arch-orange">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>     <span class="arch-blue">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>     <span class="arch-green">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+<span class="arch-orange">&#9474;</span>   <span class="arch-bright">CLI UI</span>    <span class="arch-orange">&#9474;</span>     <span class="arch-blue">&#9474;</span>  <span class="arch-bright">Core Loop</span>  <span class="arch-blue">&#9474;</span>     <span class="arch-green">&#9474;</span>   <span class="arch-bright">Engines</span>   <span class="arch-green">&#9474;</span>
+<span class="arch-orange">&#9474;</span>  <span class="arch-dim">@clack</span>     <span class="arch-orange">&#9474;</span><span class="arch-dim">&#9472;&#9472;&#9472;&#9472;</span><span class="arch-blue">&#9474;</span>  <span class="arch-dim">executor</span>   <span class="arch-blue">&#9474;</span><span class="arch-dim">&#9472;&#9472;&#9472;&#9472;</span><span class="arch-green">&#9474;</span>  <span class="arch-dim">Claude</span>     <span class="arch-green">&#9474;</span>
+<span class="arch-orange">&#9474;</span>  <span class="arch-dim">blessed</span>    <span class="arch-orange">&#9474;</span>     <span class="arch-blue">&#9474;</span>  <span class="arch-dim">reviewer</span>   <span class="arch-blue">&#9474;</span>     <span class="arch-green">&#9474;</span>  <span class="arch-dim">Gemini</span>     <span class="arch-green">&#9474;</span>
+<span class="arch-orange">&#9474;</span>  <span class="arch-dim">dashboard</span>  <span class="arch-orange">&#9474;</span>     <span class="arch-blue">&#9474;</span>  <span class="arch-dim">scoring</span>    <span class="arch-blue">&#9474;</span>     <span class="arch-green">&#9474;</span>  <span class="arch-dim">Codex</span>      <span class="arch-green">&#9474;</span>
+<span class="arch-orange">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>     <span class="arch-blue">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>     <span class="arch-green">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                           <span class="arch-dim">&#9474;</span>
+                    <span class="arch-blue">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9524;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+                    <span class="arch-blue">&#9474;</span>  <span class="arch-bright">Event Bus</span>  <span class="arch-blue">&#9474;</span>
+                    <span class="arch-blue">&#9474;</span>  <span class="arch-dim">JSONL</span>      <span class="arch-blue">&#9474;</span>
+                    <span class="arch-blue">&#9474;</span>  <span class="arch-dim">queues</span>     <span class="arch-blue">&#9474;</span>
+                    <span class="arch-blue">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+                           <span class="arch-dim">&#9474;</span>
+              <span class="arch-dim">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+              <span class="arch-dim">&#9474;</span>            <span class="arch-dim">&#9474;</span>            <span class="arch-dim">&#9474;</span>
+       <span class="arch-orange">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>  <span class="arch-blue">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>  <span class="arch-green">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+       <span class="arch-orange">&#9474;</span> <span class="arch-bright">Agents</span>  <span class="arch-orange">&#9474;</span>  <span class="arch-blue">&#9474;</span><span class="arch-bright">Orchestrator</span><span class="arch-blue">&#9474;</span>  <span class="arch-green">&#9474;</span> <span class="arch-bright">Terminal</span>  <span class="arch-green">&#9474;</span>
+       <span class="arch-orange">&#9474;</span> <span class="arch-dim">PTY</span>     <span class="arch-orange">&#9474;</span>  <span class="arch-blue">&#9474;</span> <span class="arch-dim">Daemon</span>    <span class="arch-blue">&#9474;</span>  <span class="arch-green">&#9474;</span> <span class="arch-dim">Adapters</span>  <span class="arch-green">&#9474;</span>
+       <span class="arch-orange">&#9474;</span> <span class="arch-dim">wrapper</span> <span class="arch-orange">&#9474;</span>  <span class="arch-blue">&#9474;</span> <span class="arch-dim">IPC</span>       <span class="arch-blue">&#9474;</span>  <span class="arch-green">&#9474;</span> <span class="arch-dim">tmux/iTerm</span><span class="arch-green">&#9474;</span>
+       <span class="arch-orange">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>  <span class="arch-blue">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>  <span class="arch-green">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+</pre>
+    </div>
+  </section>
+
+  <!-- ============================================
+       Comparison
+       ============================================ -->
+  <section class="section section-alt" id="comparison">
+    <div class="section-header fade-in">
+      <span class="section-label">Comparison</span>
+      <h2>Why loop?</h2>
+    </div>
+
+    <div class="comparison-table-wrap fade-in">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Individual CLIs</th>
+            <th>loop-cli</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Multi-engine</td>
+            <td>Manual switching</td>
+            <td>Unified interface</td>
+          </tr>
+          <tr>
+            <td>Quality control</td>
+            <td>None</td>
+            <td>Auto-scored iteration</td>
+          </tr>
+          <tr>
+            <td>Agent coordination</td>
+            <td>Copy-paste</td>
+            <td>Event bus + IPC</td>
+          </tr>
+          <tr>
+            <td>Context sharing</td>
+            <td>Manual</td>
+            <td>Shared plan file</td>
+          </tr>
+          <tr>
+            <td>Background work</td>
+            <td>Not possible</td>
+            <td>Daemon + orchestrator</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================
+       Footer
+       ============================================ -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <a href="#" class="logo">
+          <span class="logo-icon">&infin;</span>
+          <span class="logo-text">LOOP</span>
+        </a>
+      </div>
+
+      <div class="footer-links">
+        <a href="https://github.com/user/loop-cli">GitHub</a>
+        <span class="sep">|</span>
+        <span>v0.1.0</span>
+        <span class="sep">|</span>
+        <span>MIT License</span>
+        <span class="sep">|</span>
+        <span>Built with loop-cli</span>
+      </div>
+    </div>
+
+    <div class="footer-bottom-text">
+      &copy; 2026 loop-cli // Iterative Multi-Engine AI Orchestration
+    </div>
+  </footer>
+
+  <!-- ============================================
+       JavaScript
+       ============================================ -->
+  <script>
+    // Fade-in on scroll observer
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // Copy install command
+    document.getElementById('installBox').addEventListener('click', function() {
+      navigator.clipboard.writeText('npm install -g loop-cli').then(() => {
+        const hint = this.querySelector('.copy-hint');
+        this.classList.add('copied');
+        hint.textContent = 'copied!';
+        setTimeout(() => {
+          this.classList.remove('copied');
+          hint.textContent = 'click to copy';
+        }, 2000);
+      });
+    });
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
