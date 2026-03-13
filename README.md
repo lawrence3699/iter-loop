@@ -4,7 +4,7 @@
 
 Combine **Claude**, **Gemini**, and **Codex** in a quality-scored iteration loop. One engine executes, another reviews. Repeat until perfect.
 
-```
+```bash
 npm install -g @lawrence369/loop-cli
 ```
 
@@ -133,7 +133,25 @@ git clone https://github.com/lawrence3699/loop.git
 cd loop
 npm install
 npm run build
-npm link
+npm pack
+npm install -g ./lawrence369-loop-cli-*.tgz
+```
+
+## Validate A Local Global Install
+
+Use the packed tarball when verifying runtime fixes so the globally installed
+`loop` binary is exercising the same build you just produced.
+
+```bash
+npm run build
+npm test
+npm pack
+npm install -g ./lawrence369-loop-cli-*.tgz
+
+cd ~
+loop "Reply with exactly the single word OK" -e codex -r codex --auto --threshold 9
+loop "Reply with exactly the single word OK" -e claude -r codex --auto --threshold 9
+loop "Reply with exactly the single word OK" -e gemini -r codex --auto --threshold 9
 ```
 
 ## License

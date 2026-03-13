@@ -11,6 +11,12 @@ import { spawn, execFileSync } from "node:child_process";
 import { stripAnsi } from "../utils/ansi.js";
 import { createPtySession, type PtySession, type PtySessionOptions } from "../agent/pty-session.js";
 import { claude as claudeColor, gemini as geminiColor, codex as codexColor } from "../ui/colors.js";
+import {
+  runClaudeTtyCapture,
+  runGeminiTtyCapture,
+  supportsTtyCapturedExecution,
+  type RuntimeProgressEvent,
+} from "./runtime.js";
 
 // Re-export PtySession types for consumer convenience
 export type { PtySession, PtySessionOptions };
@@ -28,6 +34,7 @@ export interface RunOptions {
   verbose?: boolean;
   onData?: (chunk: string) => void;
   onStatus?: (status: string) => void;
+  onProgress?: (event: RuntimeProgressEvent) => void;
   passthroughArgs?: string[];
   timeout?: number;
 }
@@ -52,38 +59,31 @@ export interface Engine {
   interactive(opts: InteractiveOptions): PtySession;
 }
 
-// ── Claude stream event types ────────────────────────
+export type RunTransport = "pipe" | "tty-capture" | "unsupported";
 
-interface StreamSystemEvent {
-  type: "system";
+export function selectRunTransport(engineName: EngineName): RunTransport {
+  switch (engineName) {
+    case "claude":
+    case "gemini":
+      return supportsTtyCapturedExecution() ? "tty-capture" : "unsupported";
+    case "codex":
+      return "pipe";
+  }
 }
 
-interface StreamEventWrapper {
-  type: "stream_event";
-  event?: {
-    type: string;
-    content_block?: { type: string; name?: string };
-    delta?: { type: string; text?: string };
-  };
+function unsupportedTransportError(engineName: "claude" | "gemini"): Error {
+  return new Error(
+    `${engineName} requires an interactive terminal in the current runtime. ` +
+    "Pipe-based execution is disabled because it hangs on this machine.",
+  );
 }
 
-interface StreamAssistantEvent {
-  type: "assistant";
-  message?: {
-    content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
-  };
+function emitProgress(
+  opts: RunOptions,
+  event: RuntimeProgressEvent,
+): void {
+  opts.onProgress?.(event);
 }
-
-interface StreamResultEvent {
-  type: "result";
-  result?: string;
-}
-
-type ClaudeStreamEvent =
-  | StreamSystemEvent
-  | StreamEventWrapper
-  | StreamAssistantEvent
-  | StreamResultEvent;
 
 // ── Claude ───────────────────────────────────────────
 
@@ -98,11 +98,22 @@ function createClaude(): Engine {
     },
 
     run(prompt, opts) {
-      // Use stream-json when streaming callbacks are provided (executor mode)
-      if (opts.onData || opts.onStatus) {
-        return spawnClaudeStream(prompt, opts);
+      const transport = selectRunTransport("claude");
+      if (transport === "tty-capture") {
+        emitProgress(opts, {
+          phase: "transport",
+          summary: "Selected executor transport",
+          transport: "tty-capture",
+          detail: "claude",
+        });
+        return runClaudeTtyCapture(prompt, opts);
       }
-      return spawnEngine("claude", ["-p", prompt, ...(opts.passthroughArgs ?? [])], opts);
+      emitProgress(opts, {
+        phase: "transport",
+        summary: "Interactive terminal required",
+        transport: "unsupported",
+      });
+      return Promise.reject(unsupportedTransportError("claude"));
     },
 
     interactive(opts) {
@@ -132,7 +143,22 @@ function createGemini(): Engine {
     },
 
     run(prompt, opts) {
-      return spawnEngine("gemini", ["-p", prompt, ...(opts.passthroughArgs ?? [])], opts);
+      const transport = selectRunTransport("gemini");
+      if (transport === "tty-capture") {
+        emitProgress(opts, {
+          phase: "transport",
+          summary: "Selected executor transport",
+          transport: "tty-capture",
+          detail: "gemini",
+        });
+        return runGeminiTtyCapture(prompt, opts);
+      }
+      emitProgress(opts, {
+        phase: "transport",
+        summary: "Interactive terminal required",
+        transport: "unsupported",
+      });
+      return Promise.reject(unsupportedTransportError("gemini"));
     },
 
     interactive(opts) {
@@ -205,10 +231,26 @@ function spawnEngine(
   opts: RunOptions,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    let sawOutput = false;
+
+    emitProgress(opts, {
+      phase: "transport",
+      summary: "Selected executor transport",
+      transport: "pipe",
+      detail: cmd,
+    });
+
     const proc = spawn(cmd, args, {
       cwd: opts.cwd ?? process.cwd(),
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, FORCE_COLOR: "0" },
+    });
+
+    emitProgress(opts, {
+      phase: "startup",
+      summary: "Starting engine process",
+      transport: "pipe",
     });
 
     let stdout = "";
@@ -223,6 +265,14 @@ function spawnEngine(
     proc.stdout.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
       stdout += text;
+      if (!sawOutput) {
+        sawOutput = true;
+        emitProgress(opts, {
+          phase: "stream",
+          summary: "Engine output detected",
+          transport: "pipe",
+        });
+      }
       if (opts.onData) {
         opts.onData(text);
       } else if (opts.verbose) {
@@ -243,7 +293,15 @@ function spawnEngine(
       if (code !== 0) {
         reject(new Error(`${cmd} exited with code ${code}\n${stderr}`));
       } else {
-        resolve(stripAnsi(stdout).trim());
+        const output = stripAnsi(stdout).trim();
+        emitProgress(opts, {
+          phase: "complete",
+          summary: "Engine run complete",
+          transport: "pipe",
+          elapsedMs: Date.now() - startedAt,
+          bytes: Buffer.byteLength(output),
+        });
+        resolve(output);
       }
     });
 
@@ -251,147 +309,5 @@ function spawnEngine(
       clearTimeout(timer);
       reject(err);
     });
-  });
-}
-
-// ── Claude stream-json helpers ───────────────────────
-
-function summarizeToolInput(name: string, input: Record<string, unknown>): string {
-  if (input.file_path) return `${name} ${input.file_path}`;
-  if (input.pattern) return `${name} ${input.pattern}`;
-  if (input.command) {
-    const cmd = String(input.command);
-    return `${name} ${cmd.length > 60 ? cmd.slice(0, 57) + "..." : cmd}`;
-  }
-  if (input.query) return `${name} ${input.query}`;
-  return name;
-}
-
-function spawnClaudeStream(
-  prompt: string,
-  opts: RunOptions,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const args = [
-      "-p",
-      prompt,
-      "--output-format",
-      "stream-json",
-      "--include-partial-messages",
-      "--verbose",
-      ...(opts.passthroughArgs ?? []),
-    ];
-
-    const proc = spawn("claude", args, {
-      cwd: opts.cwd ?? process.cwd(),
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, FORCE_COLOR: "0" },
-    });
-
-    let resultText = "";
-    let rawStdout = "";
-    let stderr = "";
-    let lineBuffer = "";
-
-    const timeoutMs = opts.timeout ?? DEFAULT_TIMEOUT;
-    const timer = setTimeout(() => {
-      proc.kill("SIGTERM");
-      reject(new Error(`Claude CLI timed out (${Math.round(timeoutMs / 60_000)} minute limit)`));
-    }, timeoutMs);
-
-    proc.stdout.on("data", (chunk: Buffer) => {
-      const text = chunk.toString();
-      rawStdout += text;
-      lineBuffer += text;
-
-      // Process complete JSON lines
-      let nlIdx: number;
-      while ((nlIdx = lineBuffer.indexOf("\n")) !== -1) {
-        const line = lineBuffer.slice(0, nlIdx).trim();
-        lineBuffer = lineBuffer.slice(nlIdx + 1);
-        if (!line) continue;
-
-        try {
-          const event = JSON.parse(line) as ClaudeStreamEvent;
-          handleStreamEvent(event, opts);
-        } catch {
-          // Non-JSON line — forward as plain text
-          opts.onData?.(line + "\n");
-        }
-      }
-    });
-
-    proc.stderr.on("data", (chunk: Buffer) => {
-      const text = chunk.toString();
-      stderr += text;
-      if (opts.verbose) {
-        process.stderr.write(text);
-      }
-    });
-
-    proc.on("close", (code) => {
-      clearTimeout(timer);
-      if (code !== 0) {
-        reject(new Error(`Claude exited with code ${code}\n${stderr}`));
-      } else {
-        // Use parsed result if available, fall back to raw stdout
-        resolve(resultText || stripAnsi(rawStdout).trim());
-      }
-    });
-
-    proc.on("error", (err) => {
-      clearTimeout(timer);
-      reject(err);
-    });
-
-    function handleStreamEvent(event: ClaudeStreamEvent, runOpts: RunOptions): void {
-      switch (event.type) {
-        case "system":
-          runOpts.onStatus?.("session started");
-          break;
-
-        // Claude CLI wraps API streaming events inside {"type":"stream_event","event":{...}}
-        case "stream_event": {
-          const inner = event.event;
-          if (!inner) break;
-
-          if (inner.type === "content_block_start") {
-            const block = inner.content_block;
-            if (block?.type === "tool_use" && block.name) {
-              runOpts.onStatus?.(block.name);
-            } else if (block?.type === "thinking") {
-              runOpts.onStatus?.("Thinking...");
-            }
-          } else if (inner.type === "content_block_delta") {
-            const delta = inner.delta;
-            if (delta?.type === "text_delta" && delta.text) {
-              runOpts.onData?.(delta.text);
-            }
-            // thinking_delta — keep status as "Thinking..."
-          }
-          break;
-        }
-
-        case "assistant": {
-          // Complete assistant message — extract tool use info for status
-          const content = event.message?.content;
-          if (Array.isArray(content)) {
-            for (const block of content) {
-              if (block.type === "tool_use" && block.name) {
-                runOpts.onStatus?.(summarizeToolInput(block.name, block.input ?? {}));
-              }
-            }
-          }
-          break;
-        }
-
-        case "result": {
-          if (typeof event.result === "string") {
-            resultText = event.result;
-          }
-          break;
-        }
-      }
-    }
   });
 }

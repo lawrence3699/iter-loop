@@ -20,6 +20,7 @@ import {
 import { evaluateReview, type ScoringConfig } from "./scoring.js";
 import { bold, dim, success, warn, brandColor } from "../ui/colors.js";
 import type { IterationRecord } from "../plan/shared-plan.js";
+import { RuntimeProgressPrinter } from "../ui/progress.js";
 
 // Shared plan functions — loaded lazily on first use to avoid race conditions.
 // Gracefully degrade to no-ops if the module isn't available.
@@ -213,11 +214,23 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
     console.log("");
     console.log(reviewerHeader(reviewer));
     console.log(revColor("  \u2502"));
+    const reviewerProgress = new RuntimeProgressPrinter({
+      color: revColor,
+      label: "reviewer",
+      verbose,
+    });
+    reviewerProgress.update({
+      phase: "review",
+      summary: "Submitting executor output for review",
+    });
 
     const revStart = Date.now();
     reviewerFeedback = await reviewer.run(reviewPrompt, {
       cwd,
       verbose,
+      onProgress(event) {
+        reviewerProgress.update(event);
+      },
       onData(chunk: string) {
         const lines = chunk.split("\n");
         for (let j = 0; j < lines.length; j++) {
@@ -229,6 +242,12 @@ export async function runLoop(options: LoopOptions): Promise<LoopResult> {
           }
         }
       },
+    });
+    reviewerProgress.update({
+      phase: "complete",
+      summary: "Reviewer response captured",
+      elapsedMs: Date.now() - revStart,
+      bytes: Buffer.byteLength(reviewerFeedback),
     });
 
     console.log(revColor("  \u2502"));

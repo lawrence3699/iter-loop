@@ -27,7 +27,7 @@ const program = new Command();
 program
   .name("loop")
   .description("Iterative multi-engine AI orchestration CLI — Claude, Gemini, Codex")
-  .version("0.2.0")
+  .version("0.2.1")
   .argument("[task]", "Task description (omit to enter interactive mode)")
   .option("-e, --executor <engine>", "Executor engine: claude | gemini | codex")
   .option("-r, --reviewer <engine>", "Reviewer engine: claude | gemini | codex")

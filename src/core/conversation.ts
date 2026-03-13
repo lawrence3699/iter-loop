@@ -9,6 +9,8 @@ import * as readline from "node:readline";
 import type { Engine } from "./engine.js";
 import type { PtySession } from "../agent/pty-session.js";
 import { dim, formatBytes, brandColor } from "../ui/colors.js";
+import { isPtyHealthy } from "./runtime.js";
+import { RuntimeProgressPrinter } from "../ui/progress.js";
 
 // ── Public types ─────────────────────────────────────
 
@@ -73,6 +75,14 @@ class PtyRenderer {
     this.receivedBytes += Buffer.byteLength(data);
     process.stdout.write(data);
     this.endedWithLineBreak = /(?:\r\n|\r|\n)$/.test(data);
+  }
+
+  ensureLineBreak(): void {
+    if (!this.started) return;
+    if (!this.endedWithLineBreak) {
+      process.stdout.write("\r\n");
+      this.endedWithLineBreak = true;
+    }
   }
 
   stop(stats: { elapsed: string; bytes: string }): void {
@@ -172,10 +182,81 @@ async function runPtySession(
   // Set up renderer before spawning the PTY so the first frame is not missed
   const renderer = new PtyRenderer(engine.name, engine.label);
   renderer.start();
+  const progress = new RuntimeProgressPrinter({
+    color: brandColor(engine.name),
+    label: "executor",
+    verbose: opts.verbose,
+    ensureLineBreak: () => renderer.ensureLineBreak(),
+  });
+
+  async function runNonInteractiveFallback(message: string): Promise<{
+    output: string;
+    bytes: number;
+    durationMs: number;
+  }> {
+    progress.update({
+      phase: "probe",
+      summary: "PTY unavailable; switching to fallback",
+      detail: message,
+      transport: "pty",
+    });
+    progress.update({
+      phase: "transport",
+      summary: "Falling back to non-interactive transport",
+    });
+
+    const start = Date.now();
+    try {
+      const output = await engine.run(initialPrompt, {
+        cwd: opts.cwd,
+        verbose: opts.verbose,
+        passthroughArgs: opts.passthroughArgs,
+        onProgress(event) {
+          progress.update(event);
+        },
+        onData(chunk: string) {
+          renderer.write(chunk);
+        },
+      });
+      const durationMs = Date.now() - start;
+      renderer.stop({ elapsed: `${(durationMs / 1000).toFixed(1)}s`, bytes: formatBytes(renderer.totalBytes) });
+      return {
+        output,
+        bytes: renderer.totalBytes,
+        durationMs,
+      };
+    } catch (err) {
+      const durationMs = Date.now() - start;
+      renderer.stop({ elapsed: `${(durationMs / 1000).toFixed(1)}s`, bytes: formatBytes(renderer.totalBytes) });
+      throw err;
+    }
+  }
+
+  if (!isPtyHealthy()) {
+    progress.update({
+      phase: "probe",
+      summary: "PTY health check failed",
+      transport: "pty",
+    });
+    return runNonInteractiveFallback(
+      "PTY runtime unavailable in the current Node environment (health probe failed).",
+    );
+  }
+
+  progress.update({
+    phase: "probe",
+    summary: "PTY health check passed",
+    transport: "pty",
+  });
 
   // Create PTY session via engine.interactive(), with fallback to engine.run()
   let session: PtySession;
   try {
+    progress.update({
+      phase: "transport",
+      summary: "Starting PTY session",
+      transport: "pty",
+    });
     session = engine.interactive({
       cwd: opts.cwd,
       passthroughArgs: opts.passthroughArgs,
@@ -186,24 +267,7 @@ async function runPtySession(
   } catch (err) {
     // PTY spawn failed — fall back to non-interactive engine.run()
     const msg = err instanceof Error ? err.message : String(err);
-    renderer.stop({ elapsed: "0.0s", bytes: "0 B" });
-    console.log(dim(`  PTY spawn failed: ${msg}`));
-    console.log(dim(`  Falling back to non-interactive mode...\n`));
-
-    const start = Date.now();
-    const output = await engine.run(initialPrompt, {
-      cwd: opts.cwd,
-      verbose: opts.verbose,
-      passthroughArgs: opts.passthroughArgs,
-      onData(chunk: string) {
-        process.stdout.write(chunk);
-      },
-    });
-    return {
-      output,
-      bytes: Buffer.byteLength(output),
-      durationMs: Date.now() - start,
-    };
+    return runNonInteractiveFallback(`PTY spawn failed: ${msg}`);
   }
 
   return new Promise((resolve, reject) => {
@@ -282,6 +346,11 @@ async function runPtySession(
       silenceTimer = setTimeout(() => {
         if (done || !promptSent) return;
         // Silence = CLI likely idle, proceed for both modes
+        progress.update({
+          phase: "waiting",
+          summary: "Executor output went idle; finalizing turn",
+          transport: "pty",
+        });
         finish();
       }, silenceTimeoutMs);
     }
@@ -293,6 +362,11 @@ async function runPtySession(
       if (!promptSent) {
         // First idle = CLI is ready for input, send the task
         promptSent = true;
+        progress.update({
+          phase: "submit",
+          summary: "Executor ready; sending prompt",
+          transport: "pty",
+        });
         session.sendLine(initialPrompt);
         resetSilenceTimer();
         return;
@@ -302,8 +376,25 @@ async function runPtySession(
       // Both modes: finish PTY session with debounce
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
-        if (!done) finish();
+        if (!done) {
+          progress.update({
+            phase: "waiting",
+            summary: "Executor response complete",
+            transport: "pty",
+          });
+          finish();
+        }
       }, IDLE_DEBOUNCE_MS);
+    });
+
+    session.on("status", (status: string) => {
+      if (!done) {
+        progress.update({
+          phase: "status",
+          summary: status,
+          transport: "pty",
+        });
+      }
     });
 
     // Reset silence timer on each output chunk
@@ -328,6 +419,11 @@ async function runPtySession(
     setTimeout(() => {
       if (!promptSent && !done) {
         promptSent = true;
+        progress.update({
+          phase: "submit",
+          summary: "Prompt detector timed out; sending prompt anyway",
+          transport: "pty",
+        });
         session.sendLine(initialPrompt);
         resetSilenceTimer();
       }
@@ -435,11 +531,13 @@ export async function runConversation(
         `  Session complete. Accumulated ${formatBytes(totalBytes)} over ${(totalDurationMs / 1000).toFixed(1)}s.`,
       ),
     );
+    console.log(dim("  Awaiting follow-up or submit."));
 
     const followUp = await promptUser();
 
     // null means user wants to submit (empty input, /done, or Ctrl+D)
     if (followUp === null) {
+      console.log(dim("  Submitting current result for review.\n"));
       break;
     }
 
