@@ -3,7 +3,7 @@ interface StarburstIconProps {
 }
 
 /**
- * Compass / starburst mark used in the "Certified Partner" badge.
+ * Compass / starburst mark used in the hero "Open source" badge.
  * Colour is driven by the parent via `fill-current` + a text colour utility.
  */
 export function StarburstIcon({ className }: StarburstIconProps) {

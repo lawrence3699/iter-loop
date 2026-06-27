@@ -1,5 +1,5 @@
 import { Clock } from 'lucide-react'
-import { NAV_LINKS } from '../../data/site'
+import { NAV_LINKS, GITHUB_URL } from '../../data/site'
 import { OrangeButton } from '../ui/OrangeButton'
 
 interface MobileMenuProps {
@@ -37,7 +37,7 @@ export function MobileMenu({ open, onClose, time }: MobileMenuProps) {
       >
         <div className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-3 py-1.5 text-[13px] text-gray-600">
           <Clock size={14} />
-          <span>{time} in London</span>
+          <span>{time} local</span>
         </div>
 
         <nav className="mt-6 flex flex-col gap-2">
@@ -54,7 +54,13 @@ export function MobileMenu({ open, onClose, time }: MobileMenuProps) {
         </nav>
 
         <div className="mt-8">
-          <OrangeButton label="Start a project" onClick={onClose} />
+          <OrangeButton
+            label="Get started"
+            onClick={() => {
+              onClose()
+              window.open(GITHUB_URL, '_blank', 'noopener,noreferrer')
+            }}
+          />
         </div>
       </div>
     </div>

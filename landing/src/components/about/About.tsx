@@ -1,4 +1,4 @@
-import { ABOUT_IMAGES } from '../../data/site'
+import { ABOUT_IMAGES, GITHUB_URL } from '../../data/site'
 import { BadgeRow } from '../ui/BadgeRow'
 import { OrangeButton } from '../ui/OrangeButton'
 
@@ -12,25 +12,25 @@ export function About() {
       <div className="mx-auto w-full max-w-[1440px]">
         <BadgeRow
           number="1"
-          label="Introducing Axion"
+          label="Introducing iter-loop"
           borderClassName="border-gray-200"
           className="mb-6 px-5 sm:mb-8 sm:px-8 lg:px-12"
         />
 
         <h2 className="mb-12 px-5 text-[clamp(1.5rem,4vw,3.2rem)] font-medium leading-[1.12] tracking-[-0.02em] text-gray-900 sm:mb-16 sm:px-8 lg:mb-28 lg:px-12">
-          Strategy-led creatives, delivering
+          Multi-engine orchestration,
           <br />
-          results in digital and beyond.
+          scored until it&apos;s right.
         </h2>
 
         {/* Mobile / tablet: stacked */}
         <div className="px-5 sm:px-8 lg:hidden">
           <p className="text-[15px] font-medium leading-[1.6] text-gray-900 sm:text-[17px]">
-            Through research, creative thinking and iteration we help growing
-            brands realize their digital full potential.
+            An executor produces the output. A reviewer scores it one to ten.
+            Feedback loops back until the work is approved.
           </p>
           <div className="mt-6">
-            <OrangeButton label="About our studio" />
+            <OrangeButton label="Read the docs" onClick={() => window.open(GITHUB_URL, '_blank', 'noopener,noreferrer')} />
           </div>
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:gap-5">
             <img
@@ -62,14 +62,14 @@ export function About() {
           <div className="flex justify-end self-start">
             <div>
               <p className="whitespace-nowrap text-[16px] font-medium leading-[1.65] text-gray-900 sm:text-[18px]">
-                Through research, creative thinking
+                An executor produces the output.
                 <br />
-                and iteration we help growing brands
+                A reviewer scores it one to ten.
                 <br />
-                realize their digital full potential.
+                Feedback loops until it&apos;s approved.
               </p>
               <div className="mt-6">
-                <OrangeButton label="About our studio" />
+                <OrangeButton label="Read the docs" onClick={() => window.open(GITHUB_URL, '_blank', 'noopener,noreferrer')} />
               </div>
             </div>
           </div>

@@ -1,4 +1,4 @@
-# Axion Studio — Landing Page
+# iter-loop — Landing Page
 
 A standalone **React 18 + TypeScript + Vite + Tailwind CSS 3.4** landing page.
 It lives in `landing/` as its own self-contained app, separate from the

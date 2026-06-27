@@ -11,13 +11,13 @@ export function CaseStudies() {
       <div className="mx-auto w-full max-w-[1440px]">
         <BadgeRow
           number="2"
-          label="Featured client work"
+          label="What's inside"
           borderClassName="border-gray-300"
           className="mb-6 px-5 sm:mb-8 sm:px-8 lg:px-12"
         />
 
         <h2 className="mb-10 px-5 text-[clamp(1.75rem,7vw,4.2rem)] font-medium leading-[1.08] tracking-[-0.03em] text-gray-900 sm:mb-14 sm:px-8 sm:text-[clamp(2.5rem,5vw,4.2rem)] lg:mb-16 lg:px-12">
-          Our projects
+          Built for the loop
         </h2>
 
         <div className="grid grid-cols-1 gap-5 px-5 sm:gap-6 sm:px-8 md:grid-cols-2 lg:gap-7 lg:px-12">

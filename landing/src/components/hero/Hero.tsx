@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useLondonTime } from '../../hooks/useLondonTime'
+import { useLocalTime } from '../../hooks/useLocalTime'
 import { ShaderBackground } from './ShaderBackground'
 import { Navbar } from './Navbar'
 import { MobileMenu } from './MobileMenu'
@@ -11,7 +11,7 @@ import { HeroContent } from './HeroContent'
  */
 export function Hero() {
   const [menuOpen, setMenuOpen] = useState(false)
-  const time = useLondonTime()
+  const time = useLocalTime()
 
   return (
     <section className="relative flex min-h-screen flex-col overflow-hidden bg-[#EFEFEF]">

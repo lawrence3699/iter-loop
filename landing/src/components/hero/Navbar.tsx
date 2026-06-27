@@ -1,5 +1,5 @@
-import { Clock, Menu, X } from 'lucide-react'
-import { NAV_LINKS, AVAILABILITY_TEXT } from '../../data/site'
+import { Clock, Menu, X, RefreshCw } from 'lucide-react'
+import { NAV_LINKS, AVAILABILITY_TEXT, GITHUB_URL } from '../../data/site'
 import { TextRollButton } from '../ui/TextRollButton'
 
 interface NavbarProps {
@@ -14,9 +14,10 @@ export function Navbar({ time, menuOpen, onToggleMenu }: NavbarProps) {
       {/* Left: logo + primary links */}
       <div className="flex items-center gap-6 pl-1">
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-900 sm:h-10 sm:w-10">
-          <span className="text-[10px] font-bold tracking-tight text-white sm:text-[11px]">
-            AX
-          </span>
+          <RefreshCw
+            className="h-4 w-4 text-white sm:h-[18px] sm:w-[18px]"
+            strokeWidth={2.5}
+          />
         </div>
         <div className="hidden items-center gap-6 md:flex">
           {NAV_LINKS.map((link) => (
@@ -38,10 +39,11 @@ export function Navbar({ time, menuOpen, onToggleMenu }: NavbarProps) {
         </span>
         <div className="flex items-center gap-1.5 text-[13px] text-gray-600">
           <Clock size={14} />
-          <span>{time} in London</span>
+          <span>{time} local</span>
         </div>
         <TextRollButton
-          label="Book a strategy call"
+          label="View on GitHub"
+          onClick={() => window.open(GITHUB_URL, '_blank', 'noopener,noreferrer')}
           className="bg-gray-900 py-2 pl-5 pr-2 text-[13px] text-white"
           circleClassName="h-6 w-6 bg-white"
           arrowClassName="text-gray-900"

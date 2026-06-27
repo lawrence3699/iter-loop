@@ -1,9 +1,9 @@
 {
-  "name": "axion-studio-landing",
+  "name": "iter-loop-landing",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Axion Studio landing page — React + Vite + Tailwind, shader hero background.",
+  "description": "iter-loop landing page — React + Vite + Tailwind, shader hero background.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
